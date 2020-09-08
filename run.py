@@ -26,6 +26,7 @@ from utils.results.zip_intermediate import (
     zip_intermediate_selected,
 )
 
+# fixme
 GEAR = "bids-app-template"
 REPO = "flywheel-apps"
 CONTAINER = f"{REPO}/{GEAR}]"
@@ -34,7 +35,6 @@ FREESURFER_FULLPATH = "/opt/freesurfer/license.txt"
 
 
 def main(gtk_context):
-
     log = gtk_context.log
 
     # Keep a list of errors and warning to print all in one place at end of log
@@ -55,7 +55,11 @@ def main(gtk_context):
     # Output will be put into a directory named as the destination id.
     # This allows the raw output to be deleted so that a zipped archive
     # can be returned.
-    output_analysisid_dir = gtk_context.output_dir / gtk_context.destination["id"]
+    output_analysisid_dir = gtk_context.output_dir / "output" / gtk_context.destination["id"]
+
+    # fixme
+    working_analysisid_dir = gtk_context.output_dir / "work" / gtk_context.destination["id"]
+    gtk_context.config["wf_base_dir"] = working_analysisid_dir
 
     # editme: optional feature
     # get # cpu's to set -openmp
@@ -73,8 +77,8 @@ def main(gtk_context):
         gtk_context.config["n_cpus"] = os_cpu_count  # zoom zoom
 
     # editme: optional feature
-    mem_gb = psutil.virtual_memory().available / (1024 ** 3)
-    log.info("psutil.virtual_memory().available= {:4.1f} GiB".format(mem_gb))
+    # mem_gb = psutil.virtual_memory().available / (1024 ** 3)
+    # log.info("psutil.virtual_memory().available= {:4.1f} GiB".format(mem_gb))
 
     # grab environment for gear (saved in Dockerfile)
     with open("/tmp/gear_environ.json", "r") as f:
@@ -99,8 +103,7 @@ def main(gtk_context):
     # print("gtk_context.config:", json.dumps(gtk_context.config, indent=4))
 
     # The main command line command to be run:
-    # editme: Set the actual gear command:
-    command = ["./tests/test.sh"]
+    command = [gtk_context.gear_dict['command']]
 
     # This is also used as part of the name of output files
     command_name = make_file_name_safe(command[0])
@@ -125,9 +128,10 @@ def main(gtk_context):
             command[ii] = cmd.split("=")[1]
 
     # editme: if the command needs a freesurfer license keep this
-    if Path(FREESURFER_FULLPATH).exists():
-        log.debug("%s exists.", FREESURFER_FULLPATH)
-    install_freesurfer_license(gtk_context, FREESURFER_FULLPATH)
+    # fixme
+    # if Path(FREESURFER_FULLPATH).exists():
+    #     log.debug("%s exists.", FREESURFER_FULLPATH)
+    # install_freesurfer_license(gtk_context, FREESURFER_FULLPATH)
 
     if len(errors) == 0:
 
@@ -186,7 +190,6 @@ def main(gtk_context):
     try:
 
         if ok_to_run:
-
             returncode = 0
 
             # Create output directory
@@ -215,8 +218,8 @@ def main(gtk_context):
         # zip entire output/<analysis_id> folder into
         #  <gear_name>_<project|subject|session label>_<analysis.id>.zip
         zip_file_name = (
-            gtk_context.manifest["name"]
-            + f"_{run_label}_{gtk_context.destination['id']}.zip"
+                gtk_context.manifest["name"]
+                + f"_{run_label}_{gtk_context.destination['id']}.zip"
         )
         zip_output(
             str(gtk_context.output_dir),
@@ -241,17 +244,22 @@ def main(gtk_context):
         # clean up: remove output that was zipped
         if Path(output_analysisid_dir).exists():
             if not gtk_context.config.get("gear-keep-output"):
-
                 log.debug('removing output directory "%s"', str(output_analysisid_dir))
                 shutil.rmtree(output_analysisid_dir)
 
             else:
-                log.info(
-                    'NOT removing output directory "%s"', str(output_analysisid_dir)
-                )
-
+                log.info('NOT removing output directory "%s"', str(output_analysisid_dir))
         else:
             log.info("Output directory does not exist so it cannot be removed")
+
+        if Path(working_analysisid_dir).exists():
+            if not gtk_context.config.get("gear-keep-output"):
+                log.debug('removing working directory "%s"', str(working_analysisid_dir))
+                shutil.rmtree(working_analysisid_dir)
+            else:
+                log.info('NOT removing working directory "%s"', str(working_analysisid_dir))
+        else:
+            log.info("Working directory does not exist so it cannot be removed")
 
         # Report errors and warnings at the end of the log so they can be easily seen.
         if len(warnings) > 0:
